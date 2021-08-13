@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 PACKAGE_NAME = 'econometric_causality'
 AUTHOR = 'Nicolaj Søndergaard Mühlbach'
 AUTHOR_EMAIL = 'n.muhlbach@gmail.com'
@@ -15,8 +15,8 @@ LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 
 INSTALL_REQUIRES = [
-      'numpy'>=1.19,
-      'pandas'>=1.2
+      'numpy>=1.19',
+      'pandas>=1.2'
 ]
 
 setup(name=PACKAGE_NAME,
