@@ -8,6 +8,8 @@ __pycache__/
 
 # Misc
 misc/
+#.pypirc
+
 
 # Distribution / packaging
 .Python
