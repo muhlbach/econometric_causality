@@ -1,2 +1,2 @@
 # econometric_causality
-muhlbach/EconometricCausality
+This repo implements various econometric and ML approaches to causal inference
