@@ -9,6 +9,7 @@ __pycache__/
 # Misc
 misc/
 .pypirc
+.DS_Store
 
 
 # Distribution / packaging
