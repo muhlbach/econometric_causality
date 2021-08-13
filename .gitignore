@@ -8,7 +8,7 @@ __pycache__/
 
 # Misc
 misc/
-#.pypirc
+.pypirc
 
 
 # Distribution / packaging
