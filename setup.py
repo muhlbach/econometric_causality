@@ -15,8 +15,13 @@ LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 
 INSTALL_REQUIRES = [
-      'numpy>=1.19',
-      'pandas>=1.2'
+      'numpy,
+      'pandas,
+      'statsmodels'
+      'sklearn',
+      'itertools',
+      'more_itertools',
+      'warnings'
 ]
 
 setup(name=PACKAGE_NAME,

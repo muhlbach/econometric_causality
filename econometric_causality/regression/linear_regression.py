@@ -4,7 +4,11 @@
 # Standard
 import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+from warnings import warn
 
+# User
+from utils.tools import break_links
 #------------------------------------------------------------------------------
 # Main
 #------------------------------------------------------------------------------
@@ -13,18 +17,24 @@ class OLS(object):
     # Constructor function
     # --------------------
     def __init__(self,
-                 method="matrix_inversion",
                  include_constant=True,
-                 covariance_type="standard",
+                 covariance_type="HC1",
                  ):
         # Initialize inputs
-        self.method = method
         self.include_constant = include_constant
         self.covariance_type = covariance_type
-
+        
+        # Sanity check parameters
+        if self.covariance_type not in self.COVARIANCE_TYPE_AVAILABLE:
+            raise Exception(f"""
+                            Argument 'covariance_type' is currently {self.covariance_type}.
+                            However, only the following options are available: {self.COVARIANCE_TYPE_AVAILABLE}
+                            """)
+                            
     # --------------------
     # Class variables
     # --------------------
+    COVARIANCE_TYPE_AVAILABLE = ['nonrobust','HC0', 'HC1', 'HC2', 'HC3', 'HAC', 'cluster']
 
     # --------------------
     # Private functions
@@ -34,24 +44,50 @@ class OLS(object):
     # Public functions
     # --------------------
     def fit(self,Y,X):
-        
+        X = break_links(x=X)
+
         if self.include_constant:
-            X["cons"] = 1
+            X = sm.add_constant(X, prepend=True)
+        else:
+            warn("No constant will be added. Make sure data 'X' contain a constant")
             
-        if self.method=="matrix_inversion":
-            beta, ssr, rank, s = np.linalg.lstsq(a=X, b=Y,rcond=None)
-            residuals = Y.sub(X.dot(beta).squeeze(), axis=0)
-            
-            
-
-        if self.covariance_type=="standard":            
-            sigma2_hat = np.dot(residuals.T,residuals) / (X.shape[0]-X.shape[1])
-            vcov_beta_hat = sigma2_hat * np.linalg.inv(np.dot(X.T, X))
-            
-        # Estimate of standard errors
-        se_beta_hat = np.sqrt(np.diag(vcov_beta_hat))
-
-        beta = pd.Series(beta.ravel(), index=X.columns)
-        se_beta_hat = pd.Series(se_beta_hat.ravel(), index=X.columns)
+        # Set up model
+        model = sm.OLS(endog=Y,
+                       exog=X,
+                       missing="none",
+                       hasconstant=True
+                       )
         
-        return beta,se_beta_hat
+        # Fit model
+        try:
+            results = model.fit(method='qr',
+                                cov_type=self.covariance_type,
+                                cov_kwds=None,
+                                use_t=True)
+        except:
+            results = model.fit(method='pinv',
+                                cov_type=self.covariance_type,
+                                cov_kwds=None,
+                                use_t=True)
+        
+        # Extract results
+        beta_hat = results.params
+        se_hat = np.sqrt(np.diag(results.cov_params()))
+        
+        if isinstance(beta_hat, pd.Series):
+            se_hat = pd.Series(se_hat, index=beta_hat.index)
+        
+        t_stat = results.tvalues
+        p_value = results.pvalues
+        
+        # Construct dictionary to be returned
+        obj_returned = {
+            "coef":beta_hat,
+            "se":se_hat,
+            "t_stats":t_stat,
+            "p_values":p_value,
+            }
+        
+        return obj_returned
+
+

@@ -113,16 +113,21 @@ class BaseCateEstimator(ABC):
         # Save data
         self.Y = Y
         self.W = W
+                
+        self.W_name = W.name
         
         # List unique treatment
-        self.unique_treatments = W['W'].unique().tolist()
+        self.unique_treatments = np.sort(W.unique()).tolist()
         
         # Find masks
-        self.mask_treament = {}
+        self.mask_treatment = {}
         self.n_obs = {}
         for w in self.unique_treatments:
-            self.mask_treament[w] = (W==w).squeeze()
-            self.n_obs[w] = self.mask_treament[w].sum()     
+            self.mask_treatment[w] = (W==w)
+            self.n_obs[w] = self.mask_treatment[w].sum()     
+            
+        self.N = len(Y)
+            
 
 
 

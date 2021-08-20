@@ -1,6 +1,7 @@
 #------------------------------------------------------------------------------
 # Libraries
 #------------------------------------------------------------------------------
+# Standard
 import numpy as np
 import pandas as pd
 
@@ -37,6 +38,27 @@ def convert_to_dfs(Y=None,W=None,X=None,Z=None):
     return Y, W, X, Z
             
 
+def convert_data(Y=None,W=None,X=None,Z=None):
+    
+    if Y is not None:
+        if isinstance(Y, np.ndarray):
+            Y = pd.Series(Y, name="Y")
+            
+    if W is not None:
+        if isinstance(W, np.ndarray):
+            W = pd.Series(W, name="W")
+            
+    if X is not None:
+        if isinstance(X, np.ndarray):
+            X = pd.DataFrame(X, columns=get_colnames(x=X,prefix="X"))
+            
+    if Z is not None:
+        if isinstance(Z, np.ndarray):
+            Z = pd.DataFrame(Z, columns=get_colnames(x=Z,prefix="Z"))
+            
+    return Y, W, X, Z
+
+
 def generate_data_rct(N=1000, p=5, return_as_df=False, **kwargs):
     
     # Beta
@@ -72,7 +94,7 @@ def generate_data_rct(N=1000, p=5, return_as_df=False, **kwargs):
     Y = (1-W)*Y0 + W*Y1
 
     # Convert to dataframes
-    Y, W, X, _ = convert_to_dfs(Y=Y,W=W,X=X)
+    Y, W, X, _ = convert_data(Y=Y,W=W,X=X)
 
     if return_as_df:
         df = pd.concat([Y,W,X], axis=1)
@@ -80,8 +102,5 @@ def generate_data_rct(N=1000, p=5, return_as_df=False, **kwargs):
         return df
     else:
         return Y, W, X
-
-        
-
         
                                   
