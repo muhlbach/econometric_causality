@@ -8,12 +8,13 @@ from sklearn.linear_model import LogisticRegression
 
 # User
 from base.base_estimator import BaseCateEstimator
+from base.propensity_score import BasePropensityScoreEstimator
 from utils.exceptions import CateError
 from utils.sanity_check import check_propensity_score_estimator
 #------------------------------------------------------------------------------
 # Treatment Effect Estimators
 #------------------------------------------------------------------------------
-class TreatmentEffectEstimator(BaseCateEstimator):
+class TreatmentEffectEstimator(BaseCateEstimator,BasePropensityScoreEstimator):
     """
     This class estimates treatment effects based on matching on inputs
     """
@@ -29,6 +30,7 @@ class TreatmentEffectEstimator(BaseCateEstimator):
     # --------------------
     # Class variables
     # --------------------
+
 
     # --------------------
     # Private functions
@@ -62,7 +64,7 @@ class TreatmentEffectEstimator(BaseCateEstimator):
         
         # Some sklearn modules with have 'predict_proba' as a method. Try this before defaulting to 'predict'
         try:
-            propensity_score = propensity_score_estimator.predict_proba(X=X)[:,-1]
+            propensity_score_raw = propensity_score_estimator.predict_proba(X=X)
         except AttributeError as attribute_error_message:
             if self.verbose:                
                 print(f"""
@@ -71,31 +73,58 @@ class TreatmentEffectEstimator(BaseCateEstimator):
                       The original error message was: 
                       {str(attribute_error_message)}
                       """)
-            propensity_score = propensity_score_estimator.predict(X=X)
+            propensity_score_raw = propensity_score_estimator.predict(X=X)
             
-        # Transform to series
-        propensity_score = pd.Series(propensity_score)
-
+        # Transform to df
+        propensity_score_raw = pd.DataFrame(propensity_score_raw)
+                                        
+        # Make sure probabilities are well-defined, e.g. they must sum to 1 over the treatment arms
+        if propensity_score_raw.shape[1]>1:
+           propensity_score_raw = propensity_score_raw.div(propensity_score_raw.sum(axis=1), axis=0)
+             
         # TODO: Make this a robustness check instead
         # Correction
-        propensity_score = np.where(propensity_score>0.99,
-                                    np.nan,
-                                    np.where(propensity_score<0.01,
-                                             np.nan,
-                                             propensity_score)
-                                    )
-
-        # Compute the estimated probablity for receiving the treatment that the individual actually received
-        propensity_score_realized = np.where(W==self.unique_treatments[-1], propensity_score, 1-propensity_score)
+        propensity_score_raw.mask(cond=(propensity_score_raw < self.LOWER_LIMIT_PROPENSITY_SCORE) | (propensity_score_raw > self.UPPER_LIMIT_PROPENSITY_SCORE),
+                              other=np.nan,
+                              inplace=True)    
+               
+        # Probability of receiving the last treatment
+        self.propensity_score = propensity_score_raw.iloc[:,-1]
         
-        self.mean_weighted_outcome_per_treatment = {}        
+        # Pre-allocate realized treatment, i.e. P(W=w|X=x)
+        self.propensity_score_realized = pd.Series(index=W.index, name="propensity_score_realized", dtype="float64")
+
+        # Convert propensity score to the "realized" treatment, meaning it should be a vector that represents the specific treatment
+        if propensity_score_raw.shape[1]>1:
+            propensity_score_raw.columns = self.unique_treatments
+            
+            for w in self.unique_treatments:
+                mask = (W==w)
+                self.propensity_score_realized.loc[mask] = propensity_score_raw.loc[mask,w]
+        else:
+            # Implicitly, we assume the last unique treatment is "highest" value, e.g., 0 vs 1
+            self.propensity_score_realized[:] = np.where(W==self.unique_treatments[-1],
+                                                         propensity_score_raw.squeeze(),
+                                                         1-propensity_score_raw.squeeze())
+        
+        # Estimate the ATE between first and last treatment arm
+        self.weighted_difference_bt_first_last_treatment = (Y*(W-self.propensity_score)) / (self.propensity_score*(1-self.propensity_score))
+
+        # Pre-allocate
+        self.mean_weighted_outcome_per_treatment = {}
+
         for w in self.unique_treatments:
-            self.mean_weighted_outcome_per_treatment[w] = ((W==w)*Y/propensity_score_realized).mean()
-            
-        # Note: The above corresponds to the simple difference between averages:
-        #W=1: (W * Y / propensity_score).mean()
-        #W=0: ((1-W) * Y / (1-propensity_score)).mean()
-            
+            # Compute weighted average by treatment arm
+            self.mean_weighted_outcome_per_treatment[w] = (((W==w)*Y)/self.propensity_score_realized).mean()
+        
+        """
+        Note: We cannot take the groupwise average. We need W to be multiplied on the Y. 
+        That is, the code below will not provide a consistent estimate
+        
+        # self.mean_weighted_outcome_per_treatment = Y.div(self.propensity_score_realized).groupby(by=W,
+        #                                                                                          as_index=True).mean().to_dict()
+        """
+        
         return self
 
     def calculate_heterogeneous_treatment_effect(self):

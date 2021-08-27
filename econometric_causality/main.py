@@ -10,7 +10,8 @@
 # Libraries
 #------------------------------------------------------------------------------
 # Standard
-from sklearn.ensemble import RandomForestRegressor
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
 
 from utils import data
 from randomized_experiments import frequentist_inference
@@ -22,7 +23,7 @@ from selection_on_observables import (regression_adjustment, matching,
 # Randomized Experiments
 #------------------------------------------------------------------------------
 # Generate data
-Y, W, X = data.generate_data_rct(N=100,p=2)
+Y, W, X = data.generate_data_rct(N=500,p=2,tau=10)
 
 #-----------------------------------
 # Frequentist inference
@@ -99,14 +100,31 @@ matching_ps_ate = matching_ps_estimator.calculate_average_treatment_effect()
 ipw_estimator = inverse_probability_weighting.TreatmentEffectEstimator()
 
 # Fit
-ipw_estimator.fit(Y=Y,W=W,X=X,propensity_score_estimator=RandomForestRegressor())
+ipw_estimator.fit(Y=Y,W=W,X=X,propensity_score_estimator=LogisticRegression())
 
 # Estimate ATE
 ipw_ate = ipw_estimator.calculate_average_treatment_effect()
 
 
 
+#-----------------------------------
+# OLS helpers
+#-----------------------------------
+# import statsmodels.api as sm
 
+# df = pd.concat([Y,W,X], axis=1).dropna()
+
+# mod_wls = sm.WLS(df.Y, sm.add_constant(df.W), weights=1/df.Prop).fit()
+# print(mod_wls.summary())
+
+# mod_wls = sm.WLS(df.Y, df.W, weights=1/df.Prop).fit()
+# print(mod_wls.summary())
+
+# mod_ols = sm.OLS(df.Y, sm.add_constant(df.W)).fit()
+# print(mod_ols.summary())
+
+# mod_ols = sm.OLS(df.Y, df.W).fit()
+# print(mod_ols.summary())
 
 
 

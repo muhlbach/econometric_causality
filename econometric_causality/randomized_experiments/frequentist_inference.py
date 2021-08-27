@@ -77,11 +77,8 @@ class TreatmentEffectEstimator(BaseCateEstimator):
             
         else:
             # Find mean and standard error for each treatment arm
-            self.mean_outcome_per_treatment = {}
-            self.var_outcome_per_treatment = {}
-            for w in self.unique_treatments:
-                self.mean_outcome_per_treatment[w]= Y[self.mask_treatment[w]].mean()
-                self.var_outcome_per_treatment[w] = Y[self.mask_treatment[w]].var()
+            self.mean_outcome_per_treatment = Y.groupby(by=W,as_index=True).mean()
+            self.var_outcome_per_treatment = Y.groupby(by=W,as_index=True).var()
             
         return self
             
