@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Misc
+literature/
 misc/
 .pypirc
 .DS_Store
