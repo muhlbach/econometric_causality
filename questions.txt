@@ -1,3 +1,0 @@
-Questions for Alberto:
-
-1) How to estimate standard errors from eq. 17?
