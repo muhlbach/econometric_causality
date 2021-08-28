@@ -129,6 +129,28 @@ class BaseCateEstimator(ABC):
         self.N = len(Y)
             
 
+    def bootstrap_mean_se(self, df, mean_estimator, n_boostrap_samples=100):
+        """
+        Bootstrap mean and variance given as function that produces an estimate from a sample        
+        """
+        # Initialize 
+        df_bootstrap = pd.DataFrame()
+        
+        # Number of samples
+        n_obs = df.shape[0]
+            
+        for _ in range(n_boostrap_samples):
+            
+            # Draw bootstrap sample with replacement
+            df_b = df.sample(n=n_obs, replace=True)
+            
+            df_bootstrap = df_bootstrap.append(mean_estimator(df_b), ignore_index=True)
+          
+       # Compute mean and variance across bootstrap samples 
+        bootstrapped_mean, bootstrapped_variance = df_bootstrap.mean(axis=0).to_dict(), df_bootstrap.var(axis=0).to_dict()
+
+        return bootstrapped_mean, bootstrapped_variance
+
 
 
 

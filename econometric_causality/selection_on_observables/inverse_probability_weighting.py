@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 # User
 from base.base_estimator import BaseCateEstimator
 from base.propensity_score import BasePropensityScoreEstimator
-from utils.exceptions import CateError
+from utils.exceptions import CateError, DfError
 from utils.sanity_check import check_propensity_score_estimator
 #------------------------------------------------------------------------------
 # Treatment Effect Estimators
@@ -22,9 +22,11 @@ class TreatmentEffectEstimator(BaseCateEstimator,BasePropensityScoreEstimator):
     # Constructor function
     # --------------------
     def __init__(self,
+                 n_boostrap_samples=1000,
                  verbose=False
                  ):
         # Initialize inputs
+        self.n_boostrap_samples = n_boostrap_samples
         self.verbose = verbose
 
     # --------------------
@@ -35,6 +37,22 @@ class TreatmentEffectEstimator(BaseCateEstimator,BasePropensityScoreEstimator):
     # --------------------
     # Private functions
     # --------------------
+    def _compute_ipw_means(self,df):
+        
+        if not isinstance(df, pd.DataFrame):
+            raise DfError(df)
+        
+        # Find unique treatments
+        unique_treatments = np.sort(df["W"].unique()).tolist()
+        
+        # Initialize            
+        mean_weighted_outcome_per_treatment = pd.DataFrame(index=[0],columns=unique_treatments)
+            
+        for w in unique_treatments:
+            mean_weighted_outcome_per_treatment.loc[:,w] = (((df["W"]==w)*df["Y"])/df["propensity_score_realized"]).mean()
+                            
+        return mean_weighted_outcome_per_treatment
+
 
     # --------------------
     # Public functions
@@ -110,12 +128,15 @@ class TreatmentEffectEstimator(BaseCateEstimator,BasePropensityScoreEstimator):
         # Estimate the ATE between first and last treatment arm
         self.weighted_difference_bt_first_last_treatment = (Y*(W-self.propensity_score)) / (self.propensity_score*(1-self.propensity_score))
 
-        # Pre-allocate
-        self.mean_weighted_outcome_per_treatment = {}
+        # Collect data
+        df = pd.concat([Y,W,self.propensity_score_realized], axis=1)
 
-        for w in self.unique_treatments:
-            # Compute weighted average by treatment arm
-            self.mean_weighted_outcome_per_treatment[w] = (((W==w)*Y)/self.propensity_score_realized).mean()
+        # Compute weighted means
+        self.mean_weighted_outcome_per_treatment = self._compute_ipw_means(df=df).T.squeeze().to_dict()
+
+        _, self.var_weighted_outcome_per_treatment = super().bootstrap_mean_se(df=df,
+                                                                               mean_estimator=self._compute_ipw_means,
+                                                                               n_boostrap_samples=100)
         
         """
         Note: We cannot take the groupwise average. We need W to be multiplied on the Y. 
@@ -138,7 +159,9 @@ class TreatmentEffectEstimator(BaseCateEstimator,BasePropensityScoreEstimator):
         
         # Compute the ATE as the difference in sample means of the outcome between group1 (treated) and group2 (control)
         tau = self.mean_weighted_outcome_per_treatment[w1] - self.mean_weighted_outcome_per_treatment[w0]
+        tau_se = np.sqrt(self.var_weighted_outcome_per_treatment[w1]/self.n_obs[w1] + self.var_weighted_outcome_per_treatment[w0]/self.n_obs[w0])
         
-        tau_obj = {"ate":tau}
-        
+        tau_obj = {"ate":tau,
+                   "se":tau_se}
+    
         return tau_obj
